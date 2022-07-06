@@ -5,16 +5,19 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.spyk
-import io.mockk.verifyOrder
 import io.reactivex.rxjava3.core.Single
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 
+@ExperimentalCoroutinesApi
 class ObservablesWithSubscribeViewModelTest : DescribeSpec({
     describe("The ObservablesWithSubscribeViewModel") {
         val userProfileRepository: UserProfileRepository = mockk()
-        val viewModelState: MutableStateFlow<ObservablesWithSubscribeUiState> =
-            spyk(MutableStateFlow(ObservablesWithSubscribeUiState()))
+        val viewModelState = MutableStateFlow(ObservablesWithSubscribeUiState())
+        val intermediateStates = mutableListOf<ObservablesWithSubscribeUiState>()
 
         every { userProfileRepository.getUserProfile() } returns Single.just(
             UserProfileRepository.UserInfo(
@@ -26,68 +29,72 @@ class ObservablesWithSubscribeViewModelTest : DescribeSpec({
         )
 
         val uut = ObservablesWithSubscribeViewModel(
-            userProfileRepository = userProfileRepository,
-            viewModelState = viewModelState
+            userProfileRepository,
+            viewModelState
         )
 
         describe("when getProfile") {
             describe("and the call succeeds") {
-                uut.getProfile()
+                runTest {
+                    val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+                        viewModelState.collect {
+                            intermediateStates.add(it)
+                        }
+                    }
 
-                it("updates the state to loading, then success with the user's name") {
-                    verifyOrder {
-                        viewModelState.compareAndSet(
-                            any(), ObservablesWithSubscribeUiState(
-                                error = false,
-                                loading = true
-                            )
+                    intermediateStates.clear() // Clear off value emitted by initial state
+                    uut.getProfile()
+                    job.cancel()
+
+                    it("updates the state to loading, then success with the user's name") {
+                        intermediateStates.size shouldBe 2
+
+                        intermediateStates[0] shouldBe ObservablesWithSubscribeUiState(
+                            error = false,
+                            loading = true,
+                            name = ""
                         )
 
-                        viewModelState.compareAndSet(
-                            any(), ObservablesWithSubscribeUiState(
-                                error = false,
-                                loading = false,
-                                name = "John Smith"
-                            )
+                        intermediateStates[1] shouldBe ObservablesWithSubscribeUiState(
+                            error = false,
+                            loading = false,
+                            name = "John Smith"
                         )
                     }
-                }
-
-                it("the success state is the final state") {
-                    uut.uiState.value.error shouldBe false
-                    uut.uiState.value.loading shouldBe false
-                    uut.uiState.value.name shouldBe "John Smith"
                 }
             }
 
             describe("and the call does not succeed") {
-                every { userProfileRepository.getUserProfile() } returns Single.error(
-                    IllegalStateException()
-                )
+                runTest {
+                    every { userProfileRepository.getUserProfile() } returns Single.error(
+                        IllegalStateException()
+                    )
 
-                uut.getProfile()
+                    val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+                        viewModelState.collect {
+                            intermediateStates.add(it)
+                        }
+                    }
 
-                it("updates the state to loading, then error") {
-                    verifyOrder {
-                        viewModelState.compareAndSet(
-                            any(), ObservablesWithSubscribeUiState(
-                                error = false,
-                                loading = true
-                            )
+                    intermediateStates.clear() // Clear off value emitted by initial state
+                    uut.getProfile()
+                    job.cancel()
+
+                    it("updates the state to loading, then error") {
+                        intermediateStates.size shouldBe 2
+
+                        intermediateStates[0] shouldBe ObservablesWithSubscribeUiState(
+                            error = false,
+                            loading = true,
+                            name = ""
                         )
 
-//                        viewModelState.compareAndSet(
-//                            any(), ObservablesWithSubscribeUiState(
-//                                error = true,
-//                                loading = false
-//                            )
-//                        )
+                        intermediateStates[1] shouldBe ObservablesWithSubscribeUiState(
+                            error = true,
+                            loading = false,
+                            name = ""
+                        )
                     }
-                }
-
-                it("the error state is the final state") {
-                    uut.uiState.value.error shouldBe true
-                    uut.uiState.value.loading shouldBe false
                 }
             }
         }

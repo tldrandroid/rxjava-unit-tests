@@ -12,10 +12,9 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 
 /**
- * Provides a coroutine context for view models with a
- * MutableStateFlow<> that is bound to a viewModelScope
- * by provide a main looper. This is automatically
- * applied to all unit tests via the TestConfiguration
+ * Provides a coroutine context for view models with a MutableStateFlow<>
+ * that is bound to a viewModelScope by provide a main looper. This is
+ * automatically applied to all unit tests via the TestConfiguration
  * object.
  *
  * Thanks to:

@@ -33,9 +33,7 @@ class ObservablesWithSubscribeViewModel @Inject constructor(
     fun getProfile() {
         userProfileRepository
             .getUserProfile()
-            .flatMap { profile ->
-                Single.just(profile.name)
-            }
+            .flatMap { profile -> Single.just(profile.name) }
             .doOnSubscribe { viewModelState.setLoading() }
             .doOnError { viewModelState.setError() }
             .subscribe({ name ->
@@ -48,14 +46,16 @@ class ObservablesWithSubscribeViewModel @Inject constructor(
     private fun MutableStateFlow<ObservablesWithSubscribeUiState>.setError() = update {
         it.copy(
             error = true,
-            loading = false
+            loading = false,
+            name = ""
         )
     }
 
     private fun MutableStateFlow<ObservablesWithSubscribeUiState>.setLoading() = update {
         it.copy(
             error = false,
-            loading = true
+            loading = true,
+            name = ""
         )
     }
 

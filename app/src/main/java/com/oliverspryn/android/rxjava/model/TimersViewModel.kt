@@ -6,19 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.oliverspryn.android.rxjava.di.factories.RxJavaFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.reactivex.rxjava3.core.Single
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import java.util.concurrent.TimeUnit
-import javax.inject.Inject
 
 @HiltViewModel
 class TimersViewModel @Inject constructor(
-    private val rxJavaFactory: RxJavaFactory
+    private val rxJavaFactory: RxJavaFactory,
+    private val viewModelState: MutableStateFlow<TimersUiState>
 ) : ViewModel() {
-
-    private val viewModelState = MutableStateFlow(TimersUiState())
 
     val uiState = viewModelState
         .stateIn(
@@ -35,18 +34,18 @@ class TimersViewModel @Inject constructor(
     fun getNumber() {
         Single
             .timer(5L, TimeUnit.SECONDS, rxJavaFactory.io)
-            .flatMap {
-                Single.just(42)
-            }
+            .flatMap { Single.just(42) }
             .subscribe({ output ->
-                viewModelState.update {
-                    it.copy(
-                        number = output
-                    )
-                }
+                viewModelState.updateNumber(output)
             }, {
 
             })
+    }
+
+    private fun MutableStateFlow<TimersUiState>.updateNumber(number: Int) = update {
+        it.copy(
+            number = number
+        )
     }
 }
 

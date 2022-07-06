@@ -7,19 +7,18 @@ import com.oliverspryn.android.rxjava.data.UserProfileRepository
 import com.oliverspryn.android.rxjava.di.factories.RxJavaFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.reactivex.rxjava3.core.Completable
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import javax.inject.Inject
 
 @HiltViewModel
 class SwitchingSchedulersViewModel @Inject constructor(
     private val rxJavaFactory: RxJavaFactory,
-    private val userProfileRepository: UserProfileRepository
+    private val userProfileRepository: UserProfileRepository,
+    private val viewModelState: MutableStateFlow<SwitchingSchedulersUiState>
 ) : ViewModel() {
-
-    private val viewModelState = MutableStateFlow(SwitchingSchedulersUiState())
 
     val uiState = viewModelState
         .stateIn(
@@ -39,26 +38,31 @@ class SwitchingSchedulersViewModel @Inject constructor(
             .subscribeOn(rxJavaFactory.io)
             .observeOn(rxJavaFactory.ui)
             .flatMapCompletable { profile ->
-                viewModelState.update { state ->
-                    state.copy(
-                        name = profile.name
-                    )
-                }
-
+                viewModelState.updateName(profile.name)
                 Completable.complete()
             }
             .observeOn(rxJavaFactory.io)
             .andThen(userProfileRepository.getActiveLogins())
             .observeOn(rxJavaFactory.ui)
             .subscribe({ devices ->
-                viewModelState.update { state ->
-                    state.copy(
-                        devices = devices.joinToString(", ") { it.deviceName }
-                    )
-                }
+                val commaSeparatedDeviceList = devices.joinToString(", ") { it.deviceName }
+                viewModelState.updateDevices(commaSeparatedDeviceList)
             }, {
 
             })
+    }
+
+    private fun MutableStateFlow<SwitchingSchedulersUiState>.updateDevices(devices: String) =
+        update {
+            it.copy(
+                devices = devices
+            )
+        }
+
+    private fun MutableStateFlow<SwitchingSchedulersUiState>.updateName(name: String) = update {
+        it.copy(
+            name = name
+        )
     }
 }
 
